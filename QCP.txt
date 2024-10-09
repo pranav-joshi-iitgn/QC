@@ -1,0 +1,5 @@
+$MOVI(s0,-13)
+$MOVI(s1,-12)
+$BEQ(s0,s1,skip)
+$MOVI(s2,1)
+LABEL @skip

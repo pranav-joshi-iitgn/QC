@@ -65,7 +65,7 @@ class ProgramOutput:
             regval = self.outqc[reg][0]
             regval_bin = "".join([str(x) for x in regval])
             regval_int = sum([regval[i]*2**(31-i) for i in range(32)])
-            if regval_int > 2**32 : regval_int = regval_int - 2**32
+            if regval_int >= 2**31 : regval_int = regval_int - 2**32
             regval_int = str(regval_int)
             reg_string = reg + "\t : 0b" +  regval_bin + " = " + regval_int
             s.append(reg_string)
@@ -87,7 +87,7 @@ class ProgramOutput:
                 regval = self.outqc[reg][0]
                 regval_bin = "".join([str(x) for x in regval])
                 regval_int = sum([regval[i]*2**(31-i) for i in range(32)])
-                if regval_int > 2**32 : regval_int = regval_int - 2**32
+                if regval_int >= 2**31 : regval_int = regval_int - 2**32
                 regval_int = str(regval_int)
                 reg_string = reg + " & " +  regval_bin + " & " + regval_int
                 s.append(reg_string)
@@ -102,14 +102,15 @@ class ProgramOutput:
             #P = r"\begin{bmatrix}" + P + r"\end{bmatrix}"
             #Full = r"$$ \boxed{\begin{matrix}" + r"P & |\Psi\rangle & C \\" + r" &".join([P,psi,R])+ r"\end{matrix}} $$"
             Full = r"$$ \boxed{\begin{matrix}" + r"|\Psi\rangle & C \\" + r" &".join([psi,R])+ r"\end{matrix}} $$"
-            preview(Full,viewer="file",filename="QVMout.png")
+            #preview(Full,viewer="file",filename="QVMout.png")
+            return Full
             return False
         except:
             return traceback.format_exc()
 
     def run_and_display(self,i=None):
         self.run(i)
-        self.display()
+        return self.display()
 
 import tkinter as tk
 from tkinter import PhotoImage,Button,Text,Label
