@@ -1,3 +1,4 @@
+from pyquil import Program
 REG_MAP = {
     "at":"s31","1":"s31",
     "k0":"s30","26":"s30",
@@ -24,7 +25,7 @@ for i in range(8):REG_MAP[f"s{i}"]=f"s{i}"
 for i in range(8):REG_MAP[f"{16+i}"]=f"s{i}" 
 
 QUBITS = 9
-def extract_inst(inst):
+def extract_inst(inst,qc=None):
     global REG_MAP,QUBITS
     inst = inst.split("#")[0]
     inst = inst.strip()
@@ -43,10 +44,16 @@ def extract_inst(inst):
         else:
             new_arg.append(x)
     if inst == "J":return f"JUMP @{new_arg[0]}"
-    elif inst[:5] == "GATE-":
+    elif inst[:5] == "GATE_":
         x = new_arg[0]
+        x = int(x)
         assert x>=0 and x<QUBITS,x
-        return f"{inst[5:]} {x}"
+        toret = f"{inst[5:]} {x}"
+        if qc is not None:
+            toret = Program(toret)
+            toret = qc.compile(toret)
+            toret = str(toret)
+        return toret
     elif inst == "MEASURE":
         if len(new_arg)==1:
             x = new_arg[0]

@@ -6,7 +6,7 @@ import traceback
 
 class ProgramOutput:
     def __init__(self,P=""):
-        self.qc = get_qc("9q-square-qvm")
+        self.qc = get_qc("9q-qvm")
         self.wfs = WavefunctionSimulator()
         P = "\n".join([f"DECLARE s{i} BIT[32]" for i in range(32)]) + P
         P = Program(P)
@@ -102,15 +102,14 @@ class ProgramOutput:
             #P = r"\begin{bmatrix}" + P + r"\end{bmatrix}"
             #Full = r"$$ \boxed{\begin{matrix}" + r"P & |\Psi\rangle & C \\" + r" &".join([P,psi,R])+ r"\end{matrix}} $$"
             Full = r"$$ \boxed{\begin{matrix}" + r"|\Psi\rangle & C \\" + r" &".join([psi,R])+ r"\end{matrix}} $$"
-            #preview(Full,viewer="file",filename="QVMout.png")
-            return Full
+            preview(Full,viewer="file",filename="QVMout.png")
             return False
         except:
             return traceback.format_exc()
 
     def run_and_display(self,i=None):
         self.run(i)
-        return self.display()
+        self.display()
 
 import tkinter as tk
 from tkinter import PhotoImage,Button,Text,Label

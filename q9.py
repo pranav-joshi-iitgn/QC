@@ -1,6 +1,7 @@
 from pyquil import Program,get_qc
 from pyquil.api import WavefunctionSimulator
 from numpy import round
+from sympy import preview
 import traceback
 from IPython.display import display_latex,Latex
 
@@ -274,9 +275,9 @@ class ProgramOutput:
         self.qc = get_qc(qc_name)
         self.wfs = WavefunctionSimulator()
         P = preproc(P)
-        P = "\n".join([f"DECLARE s{i} BIT[32]" for i in range(32)]) + P
+        P = "\n".join([f"DECLARE s{i} BIT[32]" for i in range(32)]) +"\n" + P
         P = Program(P)
-        P = self.qc.compile(P)
+        #P = self.qc.compile(P)
         P = str(P)
         P = P.split("\n")
         self.Program = P
@@ -286,9 +287,10 @@ class ProgramOutput:
 
     def Burn(self,P):
         try:
-            P = "\n".join([f"DECLARE s{i} BIT[32]" for i in range(32)]) + P
+            P = preproc(P)
+            P = "\n".join([f"DECLARE s{i} BIT[32]" for i in range(32)]) + "\n" + P
             P = Program(P)
-            P = self.qc.compile(P)
+            #P = self.qc.compile(P)
             P = str(P)
             P = P.split("\n")
             self.Program = P
@@ -338,6 +340,7 @@ class ProgramOutput:
         return "\n".join(s)
 
     def display(self,states=None,regs=range(32),canvas=None,ax=None):
+        try:
             psi = [str(round(self.outwfs[i],4)) for i in range(2**9)]
             if states is None:
                 psi = [psi[i] + r"& |" + str(i) + r"\rangle" for i in range(2**9) if psi[i]!="0j"]
@@ -370,8 +373,11 @@ class ProgramOutput:
             f = open("out.md",'w')
             f.write(Full)
             f.close()
-            #preview(Full,viewer="file",filename="QVMout.png")
+            preview(Full,viewer="file",filename="QVMout.png")
+            return False
             return Latex(Full)
+        except:
+            return traceback.format_exc()
 
     def run_and_display(self,i=None):
         self.run(i)
