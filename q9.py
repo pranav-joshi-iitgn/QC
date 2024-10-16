@@ -1,9 +1,102 @@
+if __name__=="__main__":
+    import os
+    try:os.system("docker run --rm -it -p 5555:5555 rigetti/quilc -P -S")
+    except:pass
+    try:os.system("docker run --rm -it -p 5000:5000 rigetti/qvm -S")
+    except:pass
+    try:os.system("pip install numpy pyquil sympy")
+    except:pass
 from pyquil import Program,get_qc
 from pyquil.api import WavefunctionSimulator
 from numpy import round
 from sympy import preview
 import traceback
-from IPython.display import display_latex,Latex
+from numpy import round
+import tkinter as tk
+from threading import Thread
+
+REG_MAP = {
+    "at":"s31","1":"s31",
+    "k0":"s30","26":"s30",
+    "k1":"s29","27":"s29",
+    "ra":"s28","31":"s28",
+    "fp":"s27","30":"s27",
+    "sp":"s26","29":"s26",
+    "gp":"s25","28":"s25",
+
+    "zero":"s24","0":"s24",
+
+    "v0":"s8","2":"s8",
+    "v1":"s9","3":"s9",
+    "a0":"s10","4":"s10",
+    "a1":"s11","5":"s11",
+    "a2":"s12","6":"s12",
+    "a3":"s13","7":"s13",
+}
+for i in range(10):REG_MAP[f"t{i}"]=f"s{14+i}"
+for i in range(8):REG_MAP[f"{8+i}"]=f"s{14+i}"
+REG_MAP["24"]="s22"
+REG_MAP["25"]="s23"
+for i in range(8):REG_MAP[f"s{i}"]=f"s{i}"
+for i in range(8):REG_MAP[f"{16+i}"]=f"s{i}"
+
+QUBITS = 9
+def extract_inst(inst,qc=None):
+    global REG_MAP,QUBITS
+    inst = inst.split("#")[0]
+    inst = inst.strip()
+    if not inst:return ""
+    if len(inst.split(":")) > 1:
+        return "\n".join(["LABEL @" + x for x in inst.split(":") if x.strip()])
+    inst,arg = inst.split(" ")
+    inst = inst.upper()
+    arg = arg.split(",")
+    new_arg = []
+    regs = 0
+    for x in arg:
+        if x[0] == "$": #reg
+            regs += 1
+            new_arg.append(REG_MAP[x[1:]])
+        else:
+            new_arg.append(x)
+    if inst == "J":return f"JUMP @{new_arg[0]}"
+    elif inst[:5] == "GATE_":
+        x = new_arg[0]
+        x = int(x)
+        assert x>=0 and x<QUBITS,x
+        toret = f"{inst[5:]} {x}"
+        if qc is not None:
+            toret = Program(toret)
+            toret = qc.compile(toret)
+            toret = str(toret)
+        return toret
+    elif inst == "MEASURE":
+        if len(new_arg)==1:
+            x = new_arg[0]
+            x = int(x)
+            assert x>=0 and x<QUBITS,x
+            return f"MEASURE {x}"
+        else:
+            x,y,z = new_arg
+            x = int(x)
+            z = int(z)
+            assert x>=0 and x<QUBITS,x
+            assert z>=0 and z<32
+            return f"MEASURE {x} {y}[{z}]"
+    else:z,x,y = new_arg
+
+    if regs == 3:
+        return f"${inst}REG({z},{x},{y})"
+    elif inst == "ADDI":
+        y = int(y)
+        if y == 1 and z==x:return f"$INCREG({z})"
+        elif y == -1 and z==x:return f"$DECREG({z})"
+        elif x == "s24":return f"$MOVI({z},{y})"
+        else: return f"$ADDI({z},{x},{y})"
+    elif regs == 2:
+        return f"${inst}({z},{x},{y})"
+    else:
+        print(f"unknown instrucion {inst}({','.join(arg)})")
 
 def ANDREG(arg):
     x,y = arg.split(",")
@@ -52,7 +145,6 @@ def ADDREG(arg):
         f"MOVE {cin} {cout}"
         ]
     return "\n".join(L)
-
 
 def MOVI(arg):
     reg,val = arg.split(",")
@@ -176,7 +268,6 @@ def SGTREG(arg):
         L.append(f"MOVE {z}[{i}] 0")
     return "\n".join(L)
 
-
 def ADDI(arg):
     t = arg.split(",")
     if len(t) == 2:
@@ -229,26 +320,27 @@ def SRA(arg):
     return "\n".join(L)
 
 
-QUILE_TO_QUIL = {"ANDREG":ANDREG,
-     "ADDREG":ADDREG,
-     "ORREG":ORREG,
-     "NOTREG":NOTREG,
-     "MOVREG":MOVREG,
-     "INCREG":INCREG,
-     "DECREG":DECREG,
-     "SUBREG":SUBREG,
-     "NEQREG":NEQREG,
-     "SLTREG":SLTREG,
-     "SGTREG":SGTREG,
-     "MOVI":MOVI,
-     "ADDI":ADDI,
-     "SLL":SLL,
-     "SRL":SRL,
-     "SLA":SLL,
-     "SRA":SRA,
-     "BEQ":BEQ,
-     "BNE":BNE,
-    }
+QUILE_TO_QUIL = {
+    "ANDREG":ANDREG,
+    "ADDREG":ADDREG,
+    "ORREG":ORREG,
+    "NOTREG":NOTREG,
+    "MOVREG":MOVREG,
+    "INCREG":INCREG,
+    "DECREG":DECREG,
+    "SUBREG":SUBREG,
+    "NEQREG":NEQREG,
+    "SLTREG":SLTREG,
+    "SGTREG":SGTREG,
+    "MOVI":MOVI,
+    "ADDI":ADDI,
+    "SLL":SLL,
+    "SRL":SRL,
+    "SLA":SLL,
+    "SRA":SRA,
+    "BEQ":BEQ,
+    "BNE":BNE,
+}
 
 def preprocline(line):
     global QUILE_TO_QUIL
@@ -283,22 +375,19 @@ class ProgramOutput:
         self.Program = P
         self.end_line = len(P)
         self.Program = [f"I {i}" for i in range(9)] + self.Program
-        #self.Program = [f"DECLARE s{i} BIT[32]" for i in range(32)] + self.Program
 
     def Burn(self,P):
         try:
             P = preproc(P)
             P = "\n".join([f"DECLARE s{i} BIT[32]" for i in range(32)]) + "\n" + P
             P = Program(P)
-            #P = self.qc.compile(P)
             P = str(P)
             P = P.split("\n")
             self.Program = P
             self.end_line = len(P)
             self.Program = [f"I {i}" for i in range(9)] + self.Program
             return False
-        except:
-            return traceback.format_exc()
+        except:return traceback.format_exc()
 
     def run(self,end_line=None):
         try:
@@ -310,8 +399,7 @@ class ProgramOutput:
             self.outwfs = self.wfs.wavefunction(P)
             self.end_line = end_line
             return False
-        except:
-            return traceback.format_exc()
+        except:return traceback.format_exc()
     
     def step(self):
         self.end_line = min(self.end_line + 1,len(self.Program)-41)
@@ -320,10 +408,8 @@ class ProgramOutput:
     def __repr__(self):
         s = [""]
         state = str(self.outwfs)
-        if len(state) < 100:
-            s.append("State :\t" + state)    
-        else:
-            s.append("State :\t" + state[:30] + " .... " + state[-30:])
+        if len(state) < 100:s.append("State :\t" + state)
+        else:s.append("State :\t" + state[:30] + " .... " + state[-30:])
         psi = [self.outwfs[i] for i in range(2**9)]
         s.append("Psi :\t " + str(psi))
         # Registers
@@ -344,8 +430,7 @@ class ProgramOutput:
             psi = [str(round(self.outwfs[i],4)) for i in range(2**9)]
             if states is None:
                 psi = [psi[i] + r"& |" + str(i) + r"\rangle" for i in range(2**9) if psi[i]!="0j"]
-                if len(psi) > 32:
-                    psi = psi[:15] + [r"\vdots"]*2 +  psi[-15:] 
+                if len(psi) > 32:psi = psi[:15] + [r"\vdots"]*2 +  psi[-15:]
             else:
                 psi = [psi[i] + r"& |" + str(i) + r"\rangle" for i in states] + [r"\vdots"]
             psi = r"\begin{bmatrix}" + (r" \\ ").join(psi) + r"\end{bmatrix}"
@@ -360,25 +445,93 @@ class ProgramOutput:
                 reg_string = reg + " & " +  regval_bin + " & " + regval_int
                 s.append(reg_string)
             R = r"\begin{bmatrix}" + r"\\ ".join(s) +r" \end{bmatrix}"
-            #P = self.Program[41:]
-            #ran = P[:self.end_line]
-            #not_ran = P[self.end_line:]
-            #ran = [r"\text{" + x + r"}" for x in ran]
-            #not_ran = [r"\underline{\text{" + x + r"}}" for x in not_ran]
-            #P = ran + not_ran
-            #P = r"\\ ".join(P)
-            #P = r"\begin{bmatrix}" + P + r"\end{bmatrix}"
-            #Full = r"$$ \boxed{\begin{matrix}" + r"P & |\Psi\rangle & C \\" + r" &".join([P,psi,R])+ r"\end{matrix}} $$"
             Full = r"$$ \boxed{\begin{matrix}" + r"|\Psi\rangle & C \\" + r" &".join([psi,R])+ r"\end{matrix}} $$"
             f = open("out.md",'w')
             f.write(Full)
             f.close()
             preview(Full,viewer="file",filename="QVMout.png")
             return False
-            return Latex(Full)
         except:
             return traceback.format_exc()
 
     def run_and_display(self,i=None):
         self.run(i)
         return self.display()
+
+
+if __name__=="__main__":
+    # Create the main window
+    parent = tk.Tk()
+    parent.title("9q")
+    PO = ProgramOutput("")
+    PO.run_and_display()
+
+    image = tk.PhotoImage(file="QVMout.png")
+    image_label = tk.Label(parent, image=image,borderwidth=5,relief='solid')
+    def start_tryout():
+        compiled_program.configure(bg='yellow')
+        compiled_program.bg = 'yellow'
+        Thread(target=compute, daemon=True).start()
+
+    def compute():
+        try:
+            compiled_program.delete("1.0",'end')
+            S = og_program.get("1.0","end-1c")
+            S = S.split("\n")
+            S = [extract_inst(s,PO.qc) for s in S]
+            P = "\n".join(S)
+            rep = PO.Burn(P)
+            if rep is not False:
+                compiled_program.insert("end","COMPILATION PROBLEM\n" + rep)
+                compiled_program.configure(bg='red')
+                compiled_program.bg = 'red'
+                return False
+            rep = PO.run()
+            if rep is not False:
+                compiled_program.insert("end","RUNTIME PROBLEM\n" + rep)
+                compiled_program.configure(bg='red')
+                compiled_program.bg = 'red'
+                return False
+            rep = PO.display()
+            if rep is not False:
+                compiled_program.insert("end","RENDERING PROBLEM\n" + rep)
+                compiled_program.configure(bg='red')
+                compiled_program.bg = 'red'
+                return False
+            image = tk.PhotoImage(file="QVMout.png")
+            image_label.configure(image=image)
+            image_label.image = image
+            PC = PO.Program[41:]
+            compiled_program.configure(bg='light green')
+            compiled_program.bg = 'light green'
+            compiled_program.insert("end","\n".join(PC))
+            return True
+        except:
+            rep = traceback.format_exc()
+            compiled_program.delete("1.0",'end')
+            compiled_program.insert("end","GENERAL PROBLEM\n" + rep)
+            compiled_program.configure(bg='red')
+            compiled_program.bg = 'red'
+            return False
+    og_program_label = tk.Label(parent,text="Program")
+    compiled_program_label = tk.Label(parent,text="Compiled Program")
+    output_label = tk.Label(parent,text="States and Memory")
+    og_program = tk.Text(parent,bg='light yellow',width=30,height=29,borderwidth=3,relief='solid')
+    compiled_program = tk.Text(parent,bg='light green',width=30,height=29,borderwidth=3,relief='solid')
+    compile_button=tk.Button(command = start_tryout, text = "Compile and Run",borderwidth=3) ###
+    og_program_label.grid(row=0,column=0,rowspan=1)
+    compiled_program_label.grid(row=0,column=1,rowspan=1)
+    output_label.grid(row=0,column=2,rowspan=1)
+    og_program.grid(row=1,column=0,rowspan=3,columnspan=1)
+    compiled_program.grid(row=1,column=1,rowspan=3,columnspan=1)
+    image_label.grid(row=1,column=2,rowspan=3,columnspan=1)
+    compile_button.grid(row=4,column=0,columnspan=3,ipadx=580)
+
+    n_rows =5
+    n_columns =3
+    for i in range(n_rows):
+        parent.grid_rowconfigure(i,  weight =1)
+    for i in range(n_columns):
+        parent.grid_columnconfigure(i,  weight =1)
+    # Start the Tkinter event loop
+    parent.mainloop()
